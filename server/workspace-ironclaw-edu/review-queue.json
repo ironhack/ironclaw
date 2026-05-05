@@ -1,0 +1,8 @@
+{
+  "course": "TODO - set course name before first run",
+  "repo": "TODO - set GitHub repo (org/repo)",
+  "branch": "published-ft",
+  "queue": [],
+  "lastUpdated": "2026-05-05",
+  "notes": "Queue is empty. To start: ask the Education agent to scan the repo and build the queue from index.yaml."
+}
