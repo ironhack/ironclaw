@@ -29,7 +29,9 @@ Start with one course (to be specified by Rudy).
 
 - Bucket: `ih-ironclaw`
 - Folder: `education/YYYY-MM-DD/`
-- Use presigned URLs for any files shared externally
+- Upload with `--acl public-read` — objects are publicly readable by URL
+- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/education/YYYY-MM-DD/<filename>`
+- Never use presigned URLs — they expire after 7 days (AWS hard limit)
 - AWS credentials in environment
 
 ## Slack
