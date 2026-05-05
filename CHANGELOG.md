@@ -4,6 +4,24 @@ Ops log for the IronClaw server. Most recent entry first.
 
 ---
 
+## 2026-05-05 — SEO daily cron chain: 5-job pipeline
+
+**What**: Replaced single Weekly SEO Report with a 5-job chained daily pipeline for ironclaw-seo. Each job triggers the next via `openclaw cron run <id>`. Jobs 2-5 are disabled (no auto-schedule) and only fire via the chain.
+
+| Job ID | Name | Fires | Output |
+|---|---|---|---|
+| `39031b84` | GSC Snapshot | 06:00 daily | `memory/YYYY-MM-DD.md` |
+| `4289a69c` | Research Journal | triggered | appends to `seo-journal.md` |
+| `6c85765e` | Repo Analysis + Proposals | triggered | `repo-proposals-YYYY-MM-DD.md` |
+| `cc4c2154` | PR Correlation + Daily Brief | triggered | `pr-correlations-YYYY-MM-DD.md` + Slack text |
+| `48960c69` | HTML Report | triggered | S3 HTML + Slack URL |
+
+HTML report uploaded to `ih-ironclaw` S3 with `--acl public-read`. Permanent URL pattern: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/optimizer/YYYY-MM-DD/report.html`. Bucket "Block public ACLs" setting disabled to allow this.
+
+**Still active (redundant):** old Weekly SEO Report (`af48e2f2`) — review and remove.
+
+---
+
 ## 2026-05-05 — SEO agent (ironclaw-seo) fully wired
 
 **What**: Completed the ironclaw-seo (Optimizer) agent setup end-to-end.

@@ -23,7 +23,9 @@ Access via Google Search Console API v1 (direct, service account auth).
 - Bucket: `ih-ironclaw`
 - Region: `eu-west-1`
 - Folder: `optimizer/YYYY-MM-DD/`
-- Always use presigned URLs (7-day expiry), never raw S3 URLs
+- Upload with `--acl public-read` — objects are publicly readable by URL
+- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/optimizer/YYYY-MM-DD/report.html`
+- Never use presigned URLs for reports — they expire after 7 days (AWS hard limit)
 - AWS credentials already in environment
 
 ## Slack
