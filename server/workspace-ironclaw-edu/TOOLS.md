@@ -28,9 +28,9 @@ Start with one course (to be specified by Rudy).
 ## S3
 
 - Bucket: `ih-ironclaw`
-- Folder: `education/YYYY-MM-DD/`
+- Folder: `edu/YYYY-MM-DD/`
 - Upload with plain `aws s3 cp` — no `--acl` flag needed (bucket policy handles public access)
-- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/education/YYYY-MM-DD/<filename>`
+- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/edu/YYYY-MM-DD/<filename>`
 - NEVER use presigned URLs — they expire and are useless for sharing. Always use the direct URL above.
 - AWS credentials in environment
 

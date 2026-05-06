@@ -22,9 +22,9 @@ Access via Google Search Console API v1 (direct, service account auth).
 
 - Bucket: `ih-ironclaw`
 - Region: `eu-west-1`
-- Folder: `optimizer/YYYY-MM-DD/`
+- Folder: `seo/YYYY-MM-DD/`
 - Upload with plain `aws s3 cp` — no `--acl` flag needed (bucket policy handles public access)
-- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/optimizer/YYYY-MM-DD/report.html`
+- Direct permanent URL: `https://ih-ironclaw.s3.eu-west-1.amazonaws.com/seo/YYYY-MM-DD/report.html`
 - NEVER use presigned URLs — they expire and are useless for sharing. Always use the direct URL above.
 - AWS credentials already in environment
 
