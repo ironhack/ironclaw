@@ -9,43 +9,99 @@
     "background_color": "#2D2FD9"
   },
   "features": {
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
     "bot_user": {
       "display_name": "IronClaw",
       "always_online": true
-    }
+    },
+    "assistant_view": {
+      "assistant_description": "IronClaw is Ironhack's embedded AI analyst. Ask me about markets, competitors, SEO, or course content.",
+      "suggested_prompts": [
+        {
+          "title": "Competitor check",
+          "message": "What's new with our competitors this week?"
+        },
+        {
+          "title": "SEO pulse",
+          "message": "How are we ranking this week?"
+        }
+      ]
+    },
+    "slash_commands": [
+      {
+        "command": "/new",
+        "description": "Start a new session",
+        "usage_hint": "[model]",
+        "should_escape": false
+      },
+      {
+        "command": "/reset",
+        "description": "Reset the current session",
+        "should_escape": false
+      },
+      {
+        "command": "/session",
+        "description": "Manage session expiry",
+        "usage_hint": "idle <duration|off> | max-age <duration|off>",
+        "should_escape": false
+      },
+      {
+        "command": "/compact",
+        "description": "Compact the session context",
+        "usage_hint": "[instructions]",
+        "should_escape": false
+      },
+      {
+        "command": "/stop",
+        "description": "Stop the current run",
+        "should_escape": false
+      }
+    ]
   },
   "oauth_config": {
     "scopes": {
       "bot": [
+        "app_mentions:read",
+        "assistant:write",
         "channels:history",
         "channels:read",
         "chat:write",
-        "chat:write.customize",
+        "commands",
         "files:write",
         "groups:history",
         "groups:read",
         "im:history",
+        "im:read",
         "im:write",
         "mpim:history",
+        "reactions:read",
         "reactions:write",
         "users:read"
       ]
-    }
+    },
+    "pkce_enabled": false
   },
   "settings": {
-    "socket_mode_enabled": true,
-    "org_deploy_enabled": false,
-    "token_rotation_enabled": false,
     "event_subscriptions": {
       "bot_events": [
+        "app_home_opened",
+        "app_mention",
+        "assistant_thread_started",
         "message.channels",
         "message.groups",
-        "message.im",
-        "message.mpim"
+        "message.im"
       ]
     },
     "interactivity": {
-      "is_enabled": false
-    }
+      "is_enabled": true
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false,
+    "is_mcp_enabled": false
   }
 }

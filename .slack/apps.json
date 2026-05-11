@@ -1,0 +1,10 @@
+{
+  "apps": {
+    "T6S7M6EA0": {
+      "app_id": "A0B19LV97DM",
+      "team_domain": "team-ironhack",
+      "team_id": "T6S7M6EA0"
+    }
+  },
+  "default": "team-ironhack"
+}

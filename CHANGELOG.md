@@ -4,6 +4,131 @@ Ops log for the IronClaw server. Most recent entry first.
 
 ---
 
+## 2026-05-08 — SEO pipeline: delivery fixes, backlog system, WD redirect monitor
+
+**What**: Fixed Slack delivery on SEO cron jobs, redesigned Step 3 as a codebase audit, added a persistent suggestion backlog, and created a new WD redirect monitoring pipeline.
+
+**Changes:**
+
+1. **Fixed delivery on steps 1 and 2** — both had `announce -> last` which fails for cron jobs (no triggering channel). Updated to explicit `slack:C0B1MLM0L3X`.
+
+2. **Step 3 redesigned** — renamed "SEO: Implementation Audit". Now audits the `main` branch of `ironhack/foundry` and `ironhack/new-website-worker` directly (what Vercel deploys), instead of open PRs.
+
+3. **Persistent backlog** (`seo-backlog.json`) — Step 3 now runs a 3-pass approach: resolution check (re-verify open items in current `main`), discovery audit (new findings only, deduplicated), then writes a report with New Today / Resolved / Backlog sections. Seeded empty.
+
+4. **WD redirect monitor** — new weekly cron (Tue 14:30 Rome) for the WD course page consolidation. Created `wd-redirect-map.json` (25 source URLs, 12 destinations) and `wd-redirect-monitor.py` (HTTP 301 checks + GSC page-level queries). Report is narrative-driven: transfer rate, source fade, query character shift.
+
+5. **Rescheduled all jobs to after 14:00** — z.ai is unreliable in the morning. Spread weekly jobs across days to avoid collisions:
+   - Mon 14:30: Weekly Watch
+   - Tue 14:30: WD Redirect Monitor
+   - Wed 14:30: Weekly Job Scrape
+   - Thu 14:30: Caseworker Report (disabled)
+   - 14:00 daily: Course Content Review
+   - 16:00 daily: SEO pipeline
+
+---
+
+## 2026-05-06 — ironclaw-jobs agent: fully registered and live
+
+**What**: Completed server-side registration of the `ironclaw-jobs` agent (Scout). Workspace was already deployed in the previous session.
+
+**Steps completed:**
+1. Deployed workspace via `./scripts/deploy-workspaces.sh` (all 22 files including 12 bootcamp profiles)
+2. Created agent dir: `/home/openclaw/.openclaw/agents/ironclaw-jobs/agent/` with `auth-profiles.json` (copied from ironclaw-seo)
+3. Registered `ironclaw-jobs` in `openclaw.json` — added to `agents.list` and added binding for `C0B1KDU4Q8P`
+4. Added 2 cron jobs to `cron/jobs.json`:
+   - `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50001` — Weekly Job Scrape, Mon 09:00 Rome, enabled
+   - `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50002` — Weekly Caseworker Report, Mon 10:00 Rome, disabled (triggered by scrape)
+5. Ran `python3 init-db.py` — jobs.db initialized with `jobs` and `reports` tables
+6. Restarted gateway — active (running), Slack socket mode connected
+
+**Still pending:**
+- S3 bucket policy: add `jobs/*` prefix to `ih-ironclaw` public-read policy. The IAM user (`ironclaw-s3-agent`) lacks `s3:GetBucketPolicy` — must be done via AWS console. Current policy covers `seo/*`, `edu/*`, `ironclaw/*`, `watch/*`. Add: `"arn:aws:s3:::ih-ironclaw/jobs/*"`
+
+---
+
+## 2026-05-06 — ironclaw-jobs agent: workspace built, pending server registration
+
+**What**: Created the full workspace for a new `ironclaw-jobs` agent (Scout) that searches StepStone.de and Indeed.de for junior/entry-level jobs in Germany aligned with Ironhack's 12 bootcamps, stores listings in SQLite, and generates S3-hosted caseworker reports.
+
+**Files created:**
+- `server/workspace-ironclaw-jobs/` — complete workspace
+  - `SOUL.md`, `AGENTS.md`, `TOOLS.md`, `MEMORY.md` — agent persona, session rules, environment config
+  - `init-db.py` — initializes the SQLite schema on first run
+  - `jobs.db` — 0-byte placeholder (schema created at first startup)
+  - `bootcamps/` — 12 pre-extracted bootcamp profiles with job titles, search terms, language notes
+
+**Repo changes:**
+- `scripts/deploy-workspaces.sh` — added ironclaw-jobs rsync block
+- `README.md` — added agent row, 2 cron job rows, workspace path, pending tasks
+- `CLAUDE.md` — updated agent count, workspace table, priorities, channel ID
+
+**Pending (server-side, not yet done):**
+1. Deploy: `./scripts/deploy-workspaces.sh`
+2. Register agent in `/home/openclaw/.openclaw/openclaw.json`
+3. Bind Slack channel `C0B1KDU4Q8P` (`#ironclaw-jobs`) to `ironclaw-jobs`
+4. Add 2 cron jobs: Mon 09:00 Rome (scrape) and Mon 10:00 Rome (report)
+5. Add `jobs/*` to the `ih-ironclaw` S3 bucket public-read policy
+6. Run `python3 init-db.py` on server after deploy to initialize jobs.db
+7. Restart gateway: `systemctl --user restart openclaw-gateway`
+
+**Agent details:**
+- Slack channel: `#ironclaw-jobs` (ID: `C0B1KDU4Q8P`)
+- Sources: StepStone.de + Indeed.de (Tavily primary, Playwright fallback)
+- DB: SQLite at `workspace-ironclaw-jobs/jobs.db`
+- Reports: S3 `ih-ironclaw/jobs/YYYY-MM-DD/report.html`
+- Purpose: Generate evidence of German job market opportunities for 12 bootcamps, to convince Jobcenter/Arbeitsagentur caseworkers to approve public financing for students
+
+---
+
+## 2026-05-06 — SEO pipeline hardening: gsc-query.py, gh CLI, S3 public access, 16:00 reschedule
+
+**What**: Hardened the 5-job SEO cron chain after the first morning run surfaced multiple failures.
+
+**Fixes applied:**
+
+1. **GSC auth broken (env vars not passed to exec subprocesses)**
+   - Root cause: `OPENCLAW_SERVICE_MANAGED_ENV_KEYS` in `gateway.systemd.env` did not include `GOOGLE_SA_KEY_PATH` or `GOOGLE_IMPERSONATE_EMAIL`.
+   - Fix: Added both keys to `OPENCLAW_SERVICE_MANAGED_ENV_KEYS`, restarted gateway.
+
+2. **Agent writing broken GSC code instead of using script**
+   - Root cause: No pre-built script existed; agent was generating its own API code and getting it wrong.
+   - Fix: Wrote and deployed `gsc-query.py` to `/home/openclaw/.openclaw/workspace-ironclaw-seo/` with hardcoded credentials (no env var dependency). Script handles pagination, client-side country filtering (GSC AND-logic quirk), and outputs clean JSON.
+   - Updated Job 1 to call the script explicitly.
+
+3. **GSC 0 rows (country filter AND-logic bug)**
+   - Root cause: Script used `dimensionFilterGroups` with multiple `equals` filters — GSC interprets these as AND, returning nothing.
+   - Fix: Script now pulls all rows (paginated to 25k) and filters client-side by `keys[1]` country value.
+
+4. **S3 presigned URLs instead of permanent public URLs**
+   - Root cause: Bucket had Block Public Access enabled, so `--acl public-read` failed silently; agent fell back to presigning.
+   - Fix: Disabled all 4 Block Public Access settings on `ih-ironclaw` bucket. Added bucket policy granting `s3:GetObject` on prefixes `seo/*`, `edu/*`, `ironclaw/*`, `watch/*`.
+   - Updated Job 5 to use plain `aws s3 cp` without `--acl`.
+   - Updated TOOLS.md for both seo and edu agents: "NEVER use presigned URLs."
+
+5. **Slack bot token missing errors (morning z.ai degradation)**
+   - Root cause: Chinese peak hours cause z.ai service degradation; Slack delivery fails intermittently.
+   - Fix: Rescheduled Job 1 from `0 6 * * *` to `0 16 * * * @ Europe/Rome` (4 PM Rome). Jobs 2-5 chain from Job 1 so all shift together.
+
+6. **Job 3 using Python GitHub API instead of `gh` CLI**
+   - Fix: Installed `gh` CLI (`gh version 2.45.0`) via `apt-get`. Tested against `ironhack/foundry` — confirmed working.
+   - Updated Job 3 to use `gh pr list` and `gh pr diff` commands.
+   - Updated `server/workspace-ironclaw-seo/TOOLS.md` Website Repo section to document `gh` commands.
+
+7. **S3 folder was `optimizer/` instead of `seo/`**
+   - Fix: Updated all jobs and TOOLS.md to use `seo/YYYY-MM-DD/` folder.
+
+**ironclaw agent auth profiles fix:**
+- Agent dirs `ironclaw-seo` and `ironclaw-edu` had no `auth-profiles.json` — agents couldn't connect to any LLM provider.
+- Fix: Created agent dirs and copied `auth-profiles.json` from main ironclaw agent. Restarted gateway.
+
+**Still pending:**
+- Run `./scripts/deploy-workspaces.sh` to push updated TOOLS.md (rsync blocked in this session).
+- Old Weekly SEO Report (`af48e2f2`) still active — redundant, should be removed.
+- Verify full 5-job chain succeeds at 16:00 Rome run on 2026-05-06.
+
+---
+
 ## 2026-05-05 — SEO daily cron chain: 5-job pipeline
 
 **What**: Replaced single Weekly SEO Report with a 5-job chained daily pipeline for ironclaw-seo. Each job triggers the next via `openclaw cron run <id>`. Jobs 2-5 are disabled (no auto-schedule) and only fire via the chain.

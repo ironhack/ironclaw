@@ -2,21 +2,27 @@
 
 ## Google Search Console
 
-Access via Google Search Console API v1 (direct, service account auth).
+Access via pre-built script — do NOT write your own GSC API code.
 
-- Property: https://www.ironhack.com/
-- Filter by country dimension to break out ES, PT, FR, NL, DE
-- Credentials: service account JSON at GOOGLE_SA_KEY_PATH, impersonating GOOGLE_IMPERSONATE_EMAIL via domain-wide delegation
-- API endpoint: https://searchconsole.googleapis.com/webmasters/v3/sites/{siteUrl}/searchAnalytics/query
-- Use the `searchAnalytics.query` method; dimensions: `["query","country","page","date"]`
+- Script: `/home/openclaw/.openclaw/workspace-ironclaw-seo/gsc-query.py`
+- Usage: `python3 gsc-query.py <start-date> <end-date> [country1 country2 ...]`
+  - Dates: `YYYY-MM-DD` format
+  - Countries: `esp`, `prt`, `fra`, `nld`, `deu` (ISO alpha-3, lowercase)
+  - No countries arg = all markets
+- Output: JSON `{"rows": [...], "total_fetched": N, "total_filtered": N}`
+  - Each row: `{"keys": [query, country, page, date], "clicks": N, "impressions": N, "ctr": F, "position": F}`
+- Property: `https://www.ironhack.com/`
+- Credentials are hardcoded in the script — no env var setup needed
 
 ## Website Repo
 
-- Main site: https://github.com/ironhack/foundry
-- Worker/edge: https://github.com/ironhack/new-website-worker
-- Use GITHUB_TOKEN (already in env) for access — read-only on both repos, including PRs
+- Main site: `ironhack/foundry`
+- Worker/edge: `ironhack/new-website-worker`
+- Use `gh` CLI — GITHUB_TOKEN is already in env, `gh` picks it up automatically
 - PR access is intentional: correlate deploy history with ranking changes
-- Clone to /tmp/ironhack-foundry and /tmp/ironhack-worker for analysis, do not modify directly
+- List merged PRs: `gh pr list --repo ironhack/foundry --state merged --limit 20 --json number,title,mergedAt,author`
+- Diff a PR: `gh pr diff <number> --repo ironhack/foundry`
+- Do not clone or modify directly
 
 ## S3 File Sharing
 

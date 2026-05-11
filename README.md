@@ -27,13 +27,14 @@ openclaw sessions --all-agents --active 60
 
 ## Agents
 
-Three agents, all running in the same gateway process:
+Four agents, all running in the same gateway process:
 
 | Agent | Channel | Purpose |
 |---|---|---|
 | `ironclaw` | DMs + `#ironclaw-watch` | Router, leadership ops, competitive intelligence |
 | `ironclaw-seo` | `#ironclaw-seo` | SEO analyst |
 | `ironclaw-edu` | `#ironclaw-edu` | Education content QA |
+| `ironclaw-jobs` | `#ironclaw-jobs` | German job market research for caseworker reports |
 
 - **`#ironclaw-watch`** routes to `ironclaw` with a channel-level system prompt that primes it for competitive analysis. Also receives the Monday 07:00 Rome cron digest.
 - DMs go to `ironclaw` via pairing (no binding needed). Command owner: Rudy (`slack:U02MV9VPGV6`).
@@ -49,6 +50,8 @@ Workspace files live in `server/workspace-ironclaw-*/` in this repo. Deploy with
 | Weekly Competitor Watch | ironclaw | Mon 07:00 Rome | `#ironclaw-watch` |
 | Weekly SEO Report | ironclaw-seo | Mon 08:00 Rome | `#ironclaw-seo` |
 | Course Content Review | ironclaw-edu | Daily 06:00 Rome | `#ironclaw-edu` |
+| Weekly Job Scrape | ironclaw-jobs | Mon 09:00 Rome | `#ironclaw-jobs` |
+| Weekly Caseworker Report | ironclaw-jobs | Mon 10:00 Rome | `#ironclaw-jobs` |
 
 ---
 
@@ -79,6 +82,7 @@ Workspace files live in `server/workspace-ironclaw-*/` in this repo. Deploy with
     memory/                   # Daily session logs
   workspace-ironclaw-seo/     # ironclaw-seo workspace (deploy from repo)
   workspace-ironclaw-edu/     # ironclaw-edu workspace (deploy from repo)
+  workspace-ironclaw-jobs/    # ironclaw-jobs workspace (deploy from repo)
   cron/
     jobs.json                 # Cron job definitions
   credentials/                # Channel credentials (pairing, allowlists)
@@ -121,7 +125,7 @@ All secrets in `/home/openclaw/.openclaw/gateway.systemd.env`:
 
 ## Pending
 
-- [ ] **Deploy SEO + EDU workspaces** — run `./scripts/deploy-workspaces.sh` once classifier allows rsync
 - [ ] **Firecrawl API key** — replace PLACEHOLDER in `gateway.systemd.env`, restart gateway
 - [ ] **Education agent bootstrap** — populate `review-queue.json` before enabling daily cron
 - [ ] **Composio + GSC** — needed for SEO agent's Search Console access
+- [ ] **S3 bucket policy** — add `jobs/*` to public-read policy on `ih-ironclaw` bucket (via AWS console; IAM user lacks `s3:GetBucketPolicy`). Current policy covers `seo/*`, `edu/*`, `ironclaw/*`, `watch/*`. Add: `arn:aws:s3:::ih-ironclaw/jobs/*`
