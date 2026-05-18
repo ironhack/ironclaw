@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   source TEXT,
   url TEXT NOT NULL,
   description TEXT,
+  summary TEXT,
   language_req TEXT,
   experience_level TEXT,
   bootcamp TEXT NOT NULL,
