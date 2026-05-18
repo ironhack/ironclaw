@@ -2,26 +2,69 @@
 
 ## Web Search & Fetch
 
-**Tavily** (`TAVILY_API_KEY` in env)
-- `tavily_search`: job discovery queries on StepStone and Indeed
-- `tavily_extract`: fetch full listing page content from a URL (works for Indeed; less reliable for StepStone)
-- NEVER combine portals in one query — run separate passes per portal (see Workflow A)
-
-**Playwright/Chromium**
-- Primary extraction method for StepStone.de (it is JS-rendered; Tavily extract returns empty)
+**Playwright/Chromium** — primary tool for all job board scraping
+- StepStone.de is JS-rendered; only Playwright returns real content
+- LinkedIn requires Playwright for scrolling and dynamic card loading
 - Installed at: `/home/openclaw/.local/bin/playwright` (Python package, use via `python3`)
-- Use the Python `playwright` sync API in a subprocess or inline script:
+- Basic usage:
   ```python
   from playwright.sync_api import sync_playwright
   with sync_playwright() as p:
       browser = p.chromium.launch(headless=True)
       page = browser.new_page()
-      page.goto(url, timeout=15000)
+      page.goto(url, timeout=20000)
       content = page.content()
       browser.close()
   ```
-- Also use as fallback when Tavily extract fails on Indeed
-- Process one URL at a time — do NOT batch Playwright calls or store full page HTML in memory
+- Process one URL at a time — do NOT batch calls or carry full HTML across loop iterations
+
+**Tavily** (`TAVILY_API_KEY` in env) — fallback only
+- `tavily_search`: use only if Playwright is explicitly blocked (CAPTCHA, connection error)
+- `tavily_extract`: last resort for page content if Playwright returns empty twice
+- Never use Tavily as the primary source for any job board
+
+## LinkedIn Scraping
+
+LinkedIn public job search works without login. Use `scrape_linkedin.py` (already in workspace)
+to handle scrolling and card extraction.
+
+**Search URL pattern:**
+```
+https://www.linkedin.com/jobs/search/?keywords=<job-title>+junior&location=Germany&f_TPR=r2592000
+```
+- `f_TPR=r2592000` = posted in the last 30 days
+- Use URL-encoded job title (spaces as `+`)
+- Also try the German keyword variant from the bootcamp profile
+
+**Usage:**
+```bash
+python3 scrape_linkedin.py "https://www.linkedin.com/jobs/search/?keywords=junior+react+developer&location=Germany&f_TPR=r2592000"
+```
+Returns JSON with `jobs` (array of title/company/location/url) and `job_ids`.
+
+**Valid LinkedIn listing URL format:**
+```
+https://www.linkedin.com/jobs/view/<NUMERIC-ID>/
+```
+- Must contain `/jobs/view/` and a numeric ID
+- Discard `/jobs/search/` pages (those are search results, not individual listings)
+- Discard URLs without a numeric ID
+
+**LinkedIn-specific integrity checks:**
+1. Format: must be `/jobs/view/<ID>/` — discard anything else
+2. Playwright fetch the individual listing URL to verify it's still active
+3. Expiry: if page shows "No longer accepting applications" or redirects to a login wall
+   with no job content visible → discard
+4. Title plausibility: same check as StepStone
+5. **Duplicate check:** if a listing with the same title + company + location already exists
+   in jobs.db (from StepStone), skip it — don't store cross-source duplicates
+
+**Bot detection notes (from `scrape_linkedin.py` experience):**
+- LinkedIn tolerates moderate Playwright usage on public search pages
+- Add `page.wait_for_timeout(3000)` after page load and scroll a few times before extracting
+- If LinkedIn redirects to a full login wall on the search page itself (not just listing pages),
+  the session is being blocked — stop and note it in the memory log; do not retry
+- Individual listing pages (`/jobs/view/`) are generally accessible without login
 
 ## URL Integrity Rules
 
@@ -72,32 +115,29 @@ https://de.indeed.com/rc/clk?jk=<job-key>   (redirect — follow it)
 
 ## Job Board Search Patterns
 
-**StepStone.de:**
+**StepStone.de** (Job A — Playwright on StepStone's own search):
 ```
-site:stepstone.de "<job title>" junior
-site:stepstone.de "<job title>" Praktikum
-site:stepstone.de "<job title>" Werkstudent
+https://www.stepstone.de/jobs/<keyword>/in-Germany/?radius=50&sort=2&datePosted=30
 ```
-Or direct URL structure:
-```
-https://www.stepstone.de/jobs/<keyword>/in-Germany/?radius=50&sort=2
-```
+- Try both English and German job title variants
+- `datePosted=30` limits to last 30 days
+- Tavily fallback (only if Playwright is blocked):
+  `site:stepstone.de "<job title>" junior`
 
-**Indeed.de:**
+**LinkedIn** (Job B — `scrape_linkedin.py` + Playwright):
 ```
-site:de.indeed.com "<job title>" junior Germany
-site:de.indeed.com "<job title>" internship Germany
+https://www.linkedin.com/jobs/search/?keywords=<job-title>+junior&location=Germany&f_TPR=r2592000
 ```
-Or direct URL structure:
-```
-https://de.indeed.com/jobs?q=<keyword>+junior&l=Germany&lang=en
-```
+- `f_TPR=r2592000` = last 30 days
+- Try German keyword variants too
+- Then Playwright-fetch each `/jobs/view/<ID>/` URL to verify and extract
+
+**Indeed.de** — blocked. Both Playwright and Tavily return nothing. Do not attempt.
 
 **Tips:**
-- Try both English and German job title variants (see each bootcamp profile)
 - "Werkstudent" + tech term is high-signal for entry-level in Germany
-- "Berufseinsteiger" = entry-level (German keyword)
-- Filter for postings in last 30 days when possible
+- "Berufseinsteiger" = entry-level German keyword
+- English-language listings are the priority — they signal no German requirement
 
 ## Language Requirement Classification
 

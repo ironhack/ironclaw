@@ -1,8 +1,29 @@
 # AGENTS.md — Scout Session Rules
 
+## Weekly Pipeline
+
+The pipeline runs as a four-job chain. Only Job A is scheduled (Wednesdays 14:30 Rome).
+Each job triggers the next when done by running:
+```bash
+openclaw cron run <next-job-id>
+```
+
+| Job | ID | Schedule | Responsibility |
+|---|---|---|---|
+| A — StepStone Scrape | `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50001` | Wed 14:30 Rome | Scrape StepStone for all 12 bootcamps |
+| B — LinkedIn Scrape | `5f02fe2a-a467-4959-8052-98f3681052ca` | disabled (triggered by A) | Scrape LinkedIn for all 12 bootcamps |
+| C — Staleness Check | `265d5501-52ac-47ef-9c9e-cba6e79e1929` | disabled (triggered by B) | Re-verify existing active listings |
+| D — Report Generation | `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50002` | disabled (triggered by C) | Generate 13 reports, upload to S3, post URLs |
+
+Each job runs in an isolated session with clean context. This is deliberate: scraping
+12 bootcamps × multiple Playwright fetches accumulates context that cannot be reclaimed
+mid-session. Starting fresh for each job keeps context bounded.
+
+---
+
 ## Session Startup
 
-Every session, do this first:
+Before doing anything else in any session:
 
 1. Read SOUL.md — internalize the mission and red lines
 2. Read TOOLS.md — confirm available tools and credentials
@@ -12,180 +33,82 @@ Every session, do this first:
    ```python
    import sqlite3
    db = sqlite3.connect('jobs.db')
-   # Migrate: add summary column if missing
    cols = [r[1] for r in db.execute("PRAGMA table_info(jobs)").fetchall()]
    if 'summary' not in cols:
        db.execute("ALTER TABLE jobs ADD COLUMN summary TEXT")
        db.commit()
        print("Migrated: added summary column")
-   # Status
-   rows = db.execute("SELECT bootcamp, COUNT(*) as cnt FROM jobs WHERE active=1 GROUP BY bootcamp ORDER BY bootcamp").fetchall()
+   rows = db.execute("SELECT bootcamp, COUNT(*) FROM jobs WHERE active=1 GROUP BY bootcamp ORDER BY bootcamp").fetchall()
    for r in rows: print(r)
    last = db.execute("SELECT MAX(last_checked) FROM jobs WHERE active=1").fetchone()[0]
    print("Last checked:", last)
    ```
-6. Note the most recent `last_checked` date — if >7 days ago, recommend a scrape run
+6. Identify which pipeline job you are running (the message payload will say `pipeline-a`,
+   `pipeline-b`, etc.). Proceed with the corresponding workflow below.
 
-Then respond to the user with a brief status: how many active listings per bootcamp, when last scraped.
+---
 
-## First-Time Setup
+## Job A — StepStone Scrape
 
-If jobs.db is empty (no tables), run init-db.py first:
+**Triggered by:** weekly cron (Wed 14:30 Rome)
+**Triggers next:** at end of this job, run:
 ```bash
-python3 init-db.py
+openclaw cron run 5f02fe2a-a467-4959-8052-98f3681052ca
 ```
 
-## Workflow A: Scrape (weekly cron or manual trigger)
+**Responsibility:** Discover new job listings on StepStone.de for all 12 bootcamps.
 
-**Trigger phrase:** "scrape", "update listings", "find new jobs", or weekly cron fires
-
-**CRITICAL: Process sequentially, one bootcamp at a time. Never spawn subagents. Never
-parallelize across bootcamps.** The reason: each URL fetch (Playwright or Tavily) adds
-content to context. Processing all 12 bootcamps at once overflows the 203k context window
-and causes rate limit errors. Finish each bootcamp completely (search → verify → store) before
-moving to the next. After storing each bootcamp's results, you can discard the fetched page
-content from working memory — only the stored DB records need to persist.
+**CRITICAL: Process one bootcamp at a time.** Never parallelize. Each Playwright fetch adds
+to the session context and cannot be reclaimed. Finish one bootcamp completely before starting
+the next. The goal is to stay within the 203k context window for all 12 bootcamps.
 
 **Steps:**
 
-1. For each file in bootcamps/:
-   a. Read the bootcamp profile (job titles, search terms, language note)
+1. For each of the 12 bootcamp slugs (in this order — same order every run for consistency):
+   `ai-web-development`, `data-analytics`, `ai-consulting-integration`, `ai-driven-ux-ui`,
+   `data-science-ml`, `ai-engineering`, `cloud-engineering`, `data-engineering`,
+   `ai-driven-marketing`, `cybersecurity`, `ai-product-management`, `devops`
 
-   b. **Run separate search passes for each portal** — do NOT combine them in a single query:
+   a. Read the bootcamp profile from `bootcamps/<slug>.md`
 
-      **StepStone pass — Playwright is mandatory, Tavily is emergency fallback only:**
-
-      Use Playwright to load StepStone's own search. This is non-negotiable: StepStone's own
-      search returns only live, current listings. Tavily searches Google's index, which is
-      always stale — it returns URLs for jobs that may have expired days or weeks ago.
-
-      For each job title in the profile, load via Playwright:
+   b. **StepStone search via Playwright** — load the search URL directly, not via Tavily:
       ```
       https://www.stepstone.de/jobs/<keyword>/in-Germany/?radius=50&sort=2&datePosted=30
       ```
-      Try both English and German keyword variants. Extract the individual listing URLs
-      (`/stellenangebote--...-inline.html`) directly from the rendered search results page.
+      Try the primary job title AND German keyword variant from the bootcamp profile.
+      Extract all individual listing URLs (`/stellenangebote--...-inline.html`) from the
+      rendered results page. Collect URLs before fetching any of them.
 
-      **Only fall back to Tavily for StepStone if Playwright explicitly fails** — meaning:
-      the browser returns a connection error, StepStone serves a CAPTCHA you cannot bypass,
-      or the IP is actively blocked (you get no search results at all, not just fewer results).
-      "Playwright is slow" or "Tavily is easier" are NOT valid reasons to fall back.
+      Fall back to Tavily (`site:stepstone.de "<job title>" junior`) only if Playwright
+      returns a connection error or CAPTCHA — not because it is easier.
 
-      If you do fall back to Tavily for StepStone, the verification rules in step (c) become
-      even stricter: every URL sourced from Tavily MUST pass the full Playwright page fetch
-      and slug consistency check. A Tavily search snippet alone is never sufficient to verify
-      a StepStone listing — you must load the actual page. If Playwright is truly unavailable
-      and you cannot load the page, discard the URL entirely. Do not store it.
+   c. **URL integrity gate** — for each URL collected:
+      1. Format check: must be `/stellenangebote--` path with a 7-8 digit numeric ID and
+         ending in `-inline.html`. Discard anything else immediately.
+      2. Playwright fetch: load the page. Do NOT use HEAD requests (gets IP blocked).
+      3. Existence check: if page says "Diese Stelle ist nicht mehr verfügbar" or 404 → discard.
+      4. **StepStone slug consistency check (mandatory):** StepStone reuses job IDs. Parse
+         the company name from the URL slug (`...--<title>-<City>-<Company>--<ID>-inline.html`)
+         and compare against the company on the fetched page. If they don't match → discard.
+         This catches reassigned IDs that serve a completely different job at a different company.
+      5. Title plausibility: the fetched title must share at least one keyword with the search
+         term that found it. If not → discard.
 
-      Tavily StepStone queries (fallback only):
-      - `site:stepstone.de "<job title>" junior`
-      - `site:stepstone.de "<job title>" Werkstudent`
-      - `site:stepstone.de "<job title>" Praktikum`
+   d. For each URL that passes the gate, extract:
+      - `title`: job title from page header
+      - `company`: from page (fall back to URL slug if not found; never store NULL)
+      - `location`: city/region
+      - `description`: first 800 chars of the role overview text
+      - `language_req`: classify from listing text (see TOOLS.md classification table)
+      - `experience_level`: classify from listing text (see TOOLS.md classification table)
 
-      **Indeed pass — same rule as StepStone:**
+   e. **Generate LLM summary** — write a 2-3 sentence summary yourself as Scout:
+      - Cover: (1) what the role involves, (2) key skills/tools, (3) language + experience level
+      - Direct and factual — no marketing language
+      - In English regardless of listing language
+      - Expected: 60-120 words
 
-      Use Playwright to load Indeed's own search first:
-      ```
-      https://de.indeed.com/jobs?q=<keyword>+junior&l=Germany&lang=en
-      ```
-      Extract individual listing URLs (`/viewjob?jk=`) from the rendered results page.
-
-      Fall back to Tavily only if Playwright is blocked or returns no results at all.
-      If you fall back to Tavily, every URL found must still be verified by loading it
-      in Playwright before storing. A Tavily snippet is not verification.
-
-      Tavily Indeed queries (fallback only):
-      - `site:de.indeed.com "<job title>" junior Germany`
-      - `site:de.indeed.com "<job title>" internship Germany`
-      Also try German variants.
-
-      Collect all result URLs from both passes before proceeding.
-
-   c. **URL integrity gate — mandatory before storing anything:**
-
-      For each URL returned by search:
-
-      1. **Validate URL format first:**
-         - StepStone listing URLs must contain a numeric job ID and end in `-inline.html`
-           (pattern: `stepstone.de/stellenangebote--...-NNNNNNN-inline.html`).
-           If the URL ends in `--index.html`, has no numeric ID, or looks like a search results
-           page, discard it immediately — it is not a real listing URL.
-         - Indeed listing URLs must contain a job key parameter (`jk=` or `/viewjob?jk=`).
-           Discard search results page URLs (`indeed.com/jobs?q=`).
-
-      2. **Extract the page content via Playwright:**
-         - For ALL URLs (both StepStone and Indeed): load the page with Playwright.
-           Do NOT make a separate HEAD request first — bulk HEAD requests get the server IP
-           blocked by both portals after ~20 requests.
-         - Tavily extract is a last resort if Playwright returns completely empty content
-           on two attempts. If Tavily extract also returns empty, discard the URL.
-
-      3. **Verify the extraction succeeded:**
-         - The extracted content must include a recognizable job title and company name.
-         - If the page returns 404, "job no longer available", "Diese Stelle ist nicht mehr
-           verfügbar", "expired", or equivalent → discard.
-         - If extraction fails entirely (no content returned) → discard. Do NOT store a listing
-           that was not successfully fetched.
-
-      4. **StepStone URL slug consistency check — mandatory:**
-         StepStone reassigns job IDs over time. A URL slug that encoded "Accenture" six weeks
-         ago may now point to a completely different employer. After fetching the page:
-         - Parse the URL slug to extract the encoded company name and job title.
-           Pattern: `...--<job-title-words>-<City>-<CompanyName>--<ID>-inline.html`
-           Example: `...Junior-Technologie-Berater-Duesseldorf-Accenture--13973821-inline.html`
-           → slug company = "Accenture", slug title ≈ "Junior Technologie Berater"
-         - Extract the actual company name and job title from the fetched page content.
-         - If the page company does NOT match the slug company → discard immediately.
-           This is the primary symptom of a reassigned job ID.
-         - If the page title shares no keywords with the slug title → discard.
-         Do NOT rely solely on whether the page loaded successfully — a successfully loaded page
-         can be a completely different job at a different company.
-
-      5. **Title plausibility check:**
-         - The job title on the fetched page must share at least one substantive keyword with
-           the search term that surfaced it (e.g. a "Junior React Developer" search returning a
-           "Callcenter Agent" listing fails this check). If it does not match → discard.
-
-   d. After passing the integrity gate, extract from the page:
-      - title, company, location, language requirements, experience level
-      - description: first 800 chars of the listing body text (role overview section)
-
-      **Company name extraction — required, not optional:**
-      - Parse from the page content first (look for company name in the header, job meta, or posting author).
-      - If the page extraction didn't yield a company name, fall back to the URL slug:
-        - StepStone: the slug pattern is `--<job-title>-<City>-<Company-Name>--<ID>-inline.html`.
-          Extract the segment between the last city token and the numeric ID.
-          Example: `...Junior-Frontend-Developer-Berlin-Apryl-GmbH--13790453-inline.html` → `Apryl GmbH`
-        - Indeed: company is usually present in the extracted page text near the job title.
-      - If company still cannot be determined after both attempts, store `"Unknown"` — never store NULL or empty string.
-
-   e. Classify language_req: scan for "English", "German B1", "Deutsch", "fließend", "native", etc.
-      (See TOOLS.md for classification table.)
-
-   f. Classify experience_level: scan for "junior", "internship", "Praktikum", "Werkstudent",
-      "0-2 years", "Berufseinsteiger". (See TOOLS.md for classification table.)
-
-   g. **Generate a concise LLM summary** — mandatory for every new listing:
-
-      Using the extracted `description` text, write a 2-3 sentence summary for a German
-      caseworker. You write this yourself as Scout — it is your synthesis of the listing.
-
-      The summary must:
-      - Be 2-3 sentences, 60-120 words
-      - Cover: (1) what the role involves day-to-day, (2) key technical skills/tools required,
-        (3) language and experience level expected
-      - Be direct and factual — no "exciting opportunity" or marketing language
-      - Be written in English regardless of the original listing language
-
-      Good example: "Junior Data Analyst role at a Berlin fintech, focused on building Power BI
-      dashboards and writing SQL queries for internal reporting pipelines. Requires Python basics
-      and 0-1 years of experience. Listing is in English with no German language requirement stated."
-
-      Store the result in the `summary` column.
-
-   h. Compute id = SHA256(url)
-
-   i. Upsert into jobs.db via Python:
+   f. Upsert into jobs.db:
       ```python
       import sqlite3, hashlib
       db = sqlite3.connect('jobs.db')
@@ -194,120 +117,219 @@ content from working memory — only the stored DB records need to persist.
           INSERT OR REPLACE INTO jobs
           (id, title, company, location, source, url, description, summary,
            language_req, experience_level, bootcamp, found_date, active, last_checked)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), 1, date('now'))
-      """, (job_id, title, company, location, source, url, description, summary,
-            language_req, experience_level, bootcamp))
+          VALUES (?, ?, ?, ?, 'stepstone', ?, ?, ?, ?, ?, ?, date('now'), 1, date('now'))
+      """, (job_id, title, company, location, url, description, summary,
+            language_req, experience_level, slug))
       db.commit()
       ```
 
-   **At end of each bootcamp:** Log how many URLs were found via search, how many passed the
-   integrity gate, and how many were stored. Release all fetched page content from working memory
-   before processing the next bootcamp — do not carry page text across bootcamp boundaries.
+   g. **After storing this bootcamp's results:** log count (URLs found / passed gate / stored).
+      Do not carry page text into the next bootcamp iteration.
 
-2. **Staleness check** — after all bootcamps are scraped:
-   a. Query stale listings via Python:
-      ```python
-      rows = db.execute("SELECT id, url, title, company, bootcamp FROM jobs WHERE active=1 AND last_checked < date('now', '-7 days')").fetchall()
-      ```
-   b. For each stale listing, fetch the URL via Playwright (for StepStone) or Tavily extract (for Indeed)
-   c. If page returns 404 / "job no longer available" / "Diese Stelle ist nicht mehr verfügbar" → set active=0
-   d. **Content drift check (StepStone):** Even if the page loads, run the slug consistency check.
-      If the company changed → set active=0.
-   e. Also compare fetched job title against stored title. If they share no keywords → set active=0.
-   f. If page loads and content matches → update last_checked, keep active=1. If `summary IS NULL`,
-      generate and store a summary now (same 2-3 sentence format as step 1g).
-   g. If fetch fails entirely → leave active; after 14 days without confirmation, auto-expire:
-      ```python
-      db.execute("UPDATE jobs SET active=0 WHERE last_checked < date('now', '-14 days') AND active=1")
-      db.commit()
-      ```
-
-3. **Post Slack summary and trigger the report workflow:**
-   Post to #ironclaw-jobs:
+2. Post brief status to #ironclaw-jobs:
    ```
-   Scout scrape complete — YYYY-MM-DD
-   • URLs found via search: X (StepStone: A, Indeed: B)
-   • Passed URL verification: C
-   • New listings stored: D | Listings expired: E
-   • Total active: Z across 12 bootcamps
-
-   Trigger: generate caseworker report YYYY-MM-DD
+   Scout Job A done — YYYY-MM-DD
+   StepStone: X new listings stored across 12 bootcamps
+   Starting LinkedIn scrape (Job B)...
    ```
-   The "Trigger: generate caseworker report" line starts a fresh report session with clean context.
-   **End the scrape session immediately after posting this message** — do NOT generate reports
-   in this same session.
 
-## Workflow B: Report (triggered by scrape completion or manual request)
+3. Trigger Job B:
+   ```bash
+   openclaw cron run 5f02fe2a-a467-4959-8052-98f3681052ca
+   ```
 
-**Trigger phrase:** "generate caseworker report", "generate report", "caseworker report", or "create report"
+4. Write memory log to `memory/YYYY-MM-DD-a.md`: new listings per bootcamp, patterns observed,
+   any StepStone issues (rate limiting, CAPTCHA, ID reassignments seen).
 
-This workflow runs in a **fresh session** with clean context. It reads from the DB only — no
-Playwright, no scraping. Report generation should be fast and not stress the context window.
+---
+
+## Job B — LinkedIn Scrape
+
+**Triggered by:** Job A
+**Triggers next:**
+```bash
+openclaw cron run 265d5501-52ac-47ef-9c9e-cba6e79e1929
+```
+
+**Responsibility:** Discover new listings on LinkedIn for all 12 bootcamps.
+
+LinkedIn does not require login for public job search pages. Use Playwright on LinkedIn's
+public search URLs. LinkedIn has bot detection — use the helper script `scrape_linkedin.py`
+which handles scrolling and extraction. See TOOLS.md for LinkedIn URL patterns.
+
+**Same sequential per-bootcamp discipline as Job A.** Process one bootcamp, store, move on.
 
 **Steps:**
 
-0. **Get today's date:**
-   ```bash
-   date +%Y-%m-%d
-   ```
-   Use this exact string as YYYY-MM-DD throughout. Do NOT use a date from memory or session history.
+1. For each of the 12 bootcamp slugs (same order as Job A):
 
-1. Query listing counts:
+   a. Read `bootcamps/<slug>.md` for job titles
+
+   b. **LinkedIn search via Playwright:**
+      Use `scrape_linkedin.py` to load and extract from:
+      ```
+      https://www.linkedin.com/jobs/search/?keywords=<job-title>+junior&location=Germany&f_TPR=r2592000
+      ```
+      (`f_TPR=r2592000` = posted in the last 30 days)
+      Also try the German keyword variant.
+
+      Extract individual listing URLs. LinkedIn listing URLs contain `/jobs/view/<ID>/`.
+
+   c. **URL integrity gate** for LinkedIn:
+      1. Format check: must be `linkedin.com/jobs/view/<numeric-ID>` format.
+         Discard search results pages (`/jobs/search/`).
+      2. Playwright fetch: load the individual listing page.
+      3. Existence check: if page says "No longer accepting applications" or shows a
+         login wall with no job content → discard.
+      4. Title plausibility: same check as StepStone.
+      5. **Duplicate check:** query jobs.db — if a listing with the same title + company +
+         location already exists from StepStone, skip it (don't duplicate in DB).
+
+   d. Extract title, company, location, description (800 chars), language_req, experience_level.
+
+   e. Generate LLM summary (same 2-3 sentence format as Job A).
+
+   f. Upsert into jobs.db with `source = 'linkedin'`.
+
+   g. Log per-bootcamp counts. Discard page content before next bootcamp.
+
+2. Post status to #ironclaw-jobs:
+   ```
+   Scout Job B done — YYYY-MM-DD
+   LinkedIn: X new listings stored across 12 bootcamps
+   Starting staleness check (Job C)...
+   ```
+
+3. Trigger Job C:
+   ```bash
+   openclaw cron run 265d5501-52ac-47ef-9c9e-cba6e79e1929
+   ```
+
+4. Write memory log to `memory/YYYY-MM-DD-b.md`: new listings per bootcamp, LinkedIn
+   patterns (which job titles work, bot detection issues, login walls encountered).
+
+---
+
+## Job C — Staleness Check
+
+**Triggered by:** Job B
+**Triggers next:**
+```bash
+openclaw cron run b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50002
+```
+
+**Responsibility:** Re-verify all active listings that have not been checked in >7 days.
+Expire dead ones. Populate missing summaries.
+
+This job scales with DB size, not with the bootcamp list — keep it strictly sequential
+and don't carry page content between verifications.
+
+**Steps:**
+
+1. Query stale listings:
    ```python
    import sqlite3
    db = sqlite3.connect('jobs.db')
-   rows = db.execute("SELECT bootcamp, COUNT(*) FROM jobs WHERE active=1 GROUP BY bootcamp ORDER BY bootcamp").fetchall()
-   total = db.execute("SELECT COUNT(*) FROM jobs WHERE active=1").fetchone()[0]
+   stale = db.execute("""
+       SELECT id, url, title, company, source, bootcamp, summary
+       FROM jobs
+       WHERE active=1 AND last_checked < date('now', '-7 days')
+       ORDER BY source, bootcamp
+   """).fetchall()
+   print(f"Stale listings to verify: {len(stale)}")
    ```
 
-2. **Generate the general report** (existing format, for monitoring and debugging):
+2. For each stale listing:
 
-   For each bootcamp, query the top 10 active listings sorted by language_req priority then
-   experience_level. Build the HTML using the General Report Format template from TOOLS.md.
-   Save to `/tmp/scout-report-YYYY-MM-DD.html`
+   a. Fetch the page via Playwright (for both StepStone and LinkedIn).
 
-   Upload:
+   b. **Expiry checks:**
+      - Page 404, "Diese Stelle ist nicht mehr verfügbar", "No longer accepting", "expired" → set `active=0`
+      - StepStone slug consistency check: if company in URL slug no longer matches page → set `active=0`
+      - Title drift: if fetched title shares no keywords with stored title → set `active=0`
+      - Fetch fails twice → leave active; after 14 days without any confirmation, auto-expire:
+        ```python
+        db.execute("UPDATE jobs SET active=0 WHERE active=1 AND last_checked < date('now', '-14 days')")
+        db.commit()
+        ```
+
+   c. If listing is still valid: update `last_checked = date('now')`, keep `active=1`.
+      If `summary IS NULL`, generate one now (same 2-3 sentence format).
+
+   d. Commit each update immediately — don't batch updates.
+
+3. Auto-expire anything beyond 14 days:
+   ```python
+   db.execute("UPDATE jobs SET active=0 WHERE active=1 AND last_checked < date('now', '-14 days')")
+   db.commit()
+   ```
+
+4. Post status to #ironclaw-jobs:
+   ```
+   Scout Job C done — YYYY-MM-DD
+   Verified: X listings | Expired: Y | Summaries filled: Z
+   Starting report generation (Job D)...
+   ```
+
+5. Trigger Job D:
+   ```bash
+   openclaw cron run b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50002
+   ```
+
+6. Write memory log to `memory/YYYY-MM-DD-c.md`: expiry counts, any patterns (which
+   bootcamps had the most expirations, which sources expire faster).
+
+---
+
+## Job D — Report Generation
+
+**Triggered by:** Job C
+**Triggers next:** nothing — end of pipeline.
+
+**Responsibility:** Read the DB and generate 13 HTML reports. No Playwright. No scraping.
+This session is read-only against the DB and write-only to S3.
+
+**Steps:**
+
+0. Get today's date:
+   ```bash
+   date +%Y-%m-%d
+   ```
+   Use this exact string everywhere. Do not guess.
+
+1. Query all active listings:
+   ```python
+   import sqlite3
+   db = sqlite3.connect('jobs.db')
+   total = db.execute("SELECT COUNT(*) FROM jobs WHERE active=1").fetchone()[0]
+   by_bootcamp = db.execute("SELECT bootcamp, COUNT(*) FROM jobs WHERE active=1 GROUP BY bootcamp ORDER BY bootcamp").fetchall()
+   ```
+
+2. **Generate the general report** (all 12 bootcamps, table format, for monitoring):
+   Use the General Report Format from TOOLS.md. Top 10 per bootcamp, sorted by language_req
+   then experience_level. Save to `/tmp/scout-report-YYYY-MM-DD.html`. Upload to S3:
    ```bash
    aws s3 cp /tmp/scout-report-YYYY-MM-DD.html \
      s3://ih-ironclaw/jobs/YYYY-MM-DD/report.html \
      --content-type text/html --region eu-west-1
    ```
 
-3. **Generate 12 per-bootcamp branded reports:**
-
-   For each of the 12 bootcamp slugs, in this order:
-   `ai-web-development`, `data-analytics`, `ai-consulting-integration`, `ai-driven-ux-ui`,
-   `data-science-ml`, `ai-engineering`, `cloud-engineering`, `data-engineering`,
-   `ai-driven-marketing`, `cybersecurity`, `ai-product-management`, `devops`
-
-   Query ALL active listings (no LIMIT):
-   ```python
-   rows = db.execute("""
-       SELECT title, company, location, url, language_req, experience_level, summary
-       FROM jobs
-       WHERE bootcamp = ? AND active = 1
-       ORDER BY
-         CASE language_req WHEN 'english_only' THEN 1 WHEN 'german_b1' THEN 2 WHEN 'unknown' THEN 3 ELSE 4 END,
-         CASE experience_level WHEN 'internship' THEN 1 WHEN 'junior' THEN 2 WHEN 'entry_level' THEN 3 ELSE 4 END
-   """, (slug,)).fetchall()
-   ```
-
-   Build HTML using the Branded Per-Bootcamp Report Format from TOOLS.md (with the embedded
-   Ironhack logo base64, Ironhack blue `#5BBFE3`, card layout, PDF export button).
-
-   Save to `/tmp/scout-report-YYYY-MM-DD-<slug>.html`
-
-   Upload:
+3. **Generate 12 per-bootcamp branded reports** (Ironhack branding, all active listings,
+   card layout, LLM summary per listing, PDF export button):
+   Use the Branded Report Format from TOOLS.md. No LIMIT — include all active listings.
+   For each slug, save to `/tmp/scout-report-YYYY-MM-DD-<slug>.html` and upload:
    ```bash
    aws s3 cp /tmp/scout-report-YYYY-MM-DD-<slug>.html \
      s3://ih-ironclaw/jobs/YYYY-MM-DD/report-<slug>.html \
      --content-type text/html --region eu-west-1
    ```
 
-4. **Post to #ironclaw-jobs:**
+4. Post all 13 URLs to #ironclaw-jobs:
    ```
-   Scout report ready — YYYY-MM-DD
-   General (all bootcamps): https://ih-ironclaw.s3.eu-west-1.amazonaws.com/jobs/YYYY-MM-DD/report.html
+   Scout pipeline complete — YYYY-MM-DD
+   X active listings across 12 bootcamps
+
+   General report: https://ih-ironclaw.s3.eu-west-1.amazonaws.com/jobs/YYYY-MM-DD/report.html
 
    Bootcamp reports:
    • AI Web Development: https://ih-ironclaw.s3.eu-west-1.amazonaws.com/jobs/YYYY-MM-DD/report-ai-web-development.html
@@ -330,24 +352,36 @@ Playwright, no scraping. Report generation should be fast and not stress the con
        "INSERT INTO reports (generated_date, s3_url, job_count, notes) VALUES (?, ?, ?, ?)",
        ('YYYY-MM-DD',
         'https://ih-ironclaw.s3.eu-west-1.amazonaws.com/jobs/YYYY-MM-DD/report.html',
-        total,
-        '13 reports: 1 general + 12 per-bootcamp branded')
+        total, '13 reports: 1 general + 12 per-bootcamp branded')
    )
    db.commit()
    ```
 
+6. Write memory log to `memory/YYYY-MM-DD-d.md`: total listings per bootcamp, report URLs,
+   any bootcamps with <5 listings (flag for next scrape to prioritize).
+
+---
+
 ## Memory Updates
 
-At the end of each session, write a brief log to memory/YYYY-MM-DD.md:
-- How many listings found/expired this run
-- Which bootcamps had the most/least results
-- Any search patterns that worked particularly well or poorly
-- Any recurring issues with sources (rate limiting, page structure changes)
-- Update MEMORY.md if any lasting patterns were discovered
+Memory files for this pipeline follow a per-job naming convention:
+- `memory/YYYY-MM-DD-a.md` — StepStone scrape log
+- `memory/YYYY-MM-DD-b.md` — LinkedIn scrape log
+- `memory/YYYY-MM-DD-c.md` — Staleness check log
+- `memory/YYYY-MM-DD-d.md` — Report generation log
+
+Update `MEMORY.md` at the end of any session where a lasting pattern is discovered
+(new working search term, new blocking pattern, seasonal trend, etc.).
+
+---
 
 ## Ad-Hoc Questions
 
-If asked a question about the job market ("are there React jobs in Berlin?", "how many cybersecurity listings?"):
+If asked a question about the job market in #ironclaw-jobs:
 - Query jobs.db via Python (sqlite3 CLI not available)
-- If the data is >7 days old, caveat that it may be stale
+- If data is >7 days old, caveat that it may be stale
 - Respond concisely in Slack (bullet list, no markdown tables)
+
+## First-Time Setup
+
+If jobs.db is missing or empty, run `python3 init-db.py` first.
