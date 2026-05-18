@@ -4,6 +4,26 @@ Ops log for the IronClaw server. Most recent entry first.
 
 ---
 
+## 2026-05-18 — Scout: 13-report system, LLM summaries, job chaining
+
+**What**: Upgraded ironclaw-jobs (Scout) to generate 13 reports per run, add LLM-generated summaries per listing, and split scrape + report into chained sessions to prevent context overflow.
+
+**Changes:**
+
+1. **13 reports per run** — Workflow B now generates 1 general report (unchanged table format, for monitoring) + 12 per-bootcamp branded HTML reports. Each bootcamp report uses Ironhack branding (blue `#5BBFE3`, logo embedded as base64), card layout with job summary, and a `window.print()` PDF export button with `@media print` CSS.
+
+2. **LLM-generated summaries** — Workflow A now generates a 2-3 sentence summary per listing at scrape time, covering role, key skills, and language/experience level. Stored in new `summary TEXT` column. Existing 145 listings have `summary = NULL` and will be populated during next staleness check.
+
+3. **Job chaining** — Workflow A ends by posting "Trigger: generate caseworker report YYYY-MM-DD" to `#ironclaw-jobs`, which starts Workflow B in a fresh session with clean context. This prevents the combined scrape+report session from hitting the 203k context limit. The weekly Caseworker Report cron remains disabled — report is now triggered by scrape completion.
+
+4. **DB migration** — added `summary TEXT` column to `jobs` table. Live migration applied on server. `init-db.py` updated to include the column in fresh installs.
+
+5. **AGENTS.md + TOOLS.md synced to repo** — the server's evolved versions (with Playwright-first rules, URL integrity gates, slug consistency checks) are now in `server/workspace-ironclaw-jobs/`. Also fixed all DB access to use Python (sqlite3 CLI not installed).
+
+**Still pending:** S3 bucket policy — add `arn:aws:s3:::ih-ironclaw/jobs/*` to public-read policy via AWS console.
+
+---
+
 ## 2026-05-08 — SEO pipeline: delivery fixes, backlog system, WD redirect monitor
 
 **What**: Fixed Slack delivery on SEO cron jobs, redesigned Step 3 as a codebase audit, added a persistent suggestion backlog, and created a new WD redirect monitoring pipeline.
