@@ -4,6 +4,36 @@ Ops log for the IronClaw server. Most recent entry first.
 
 ---
 
+## 2026-05-18 — Scout: 4-job chain with LinkedIn, 13-report system, LLM summaries
+
+**What**: Rewired ironclaw-jobs into a 4-job chain matching the SEO pipeline pattern. Added LinkedIn as a second job board source. Each job runs in an isolated session with clean context to prevent the 203k overflow that was hitting single-session scrapes.
+
+**Pipeline:**
+```
+A (scheduled Wed 14:30 Rome) → B → C → D
+StepStone scrape → LinkedIn scrape → Staleness check → Report generation
+```
+
+Each job triggers the next with `openclaw cron run <uuid>` at the end of its session.
+Jobs B, C, D are registered as disabled crons with dummy schedules — they only fire when triggered.
+
+**Job IDs:**
+- A (StepStone Scrape): `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50001` — scheduled
+- B (LinkedIn Scrape): `5f02fe2a-a467-4959-8052-98f3681052ca` — disabled
+- C (Staleness Check): `265d5501-52ac-47ef-9c9e-cba6e79e1929` — disabled
+- D (Report Generation): `b3a1c2d4-e5f6-4789-a0b1-c2d3e4f50002` — disabled
+
+**Also in this session:**
+- Job D now generates 13 reports: 1 general (table format, monitoring) + 12 per-bootcamp branded (Ironhack logo, card layout, LLM summary per listing, PDF export button)
+- LLM summaries generated at scrape time, stored in new `summary TEXT` column
+- TOOLS.md: LinkedIn search patterns, `scrape_linkedin.py` usage, bot detection notes; Indeed marked as blocked; Tavily demoted to fallback only
+- DB migrated: `summary` column added to live jobs.db
+- AGENTS.md and TOOLS.md synced to repo (server versions were more evolved)
+
+**Still pending:** S3 bucket policy — add `arn:aws:s3:::ih-ironclaw/jobs/*` to public-read policy via AWS console.
+
+---
+
 ## 2026-05-18 — Scout: 13-report system, LLM summaries, job chaining
 
 **What**: Upgraded ironclaw-jobs (Scout) to generate 13 reports per run, add LLM-generated summaries per listing, and split scrape + report into chained sessions to prevent context overflow.
