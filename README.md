@@ -12,16 +12,22 @@ leave it.
 
 ```bash
 ssh openclaw-server                                  # user openclaw, 4 cores / 8 GB, Ubuntu
-systemctl --user list-units 'hermes-*'               # one gateway per profile
-HERMES="HERMES_HOME=$HOME/.hermes $HOME/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main"
+systemctl --user list-units 'hermes-*'               # ONE host gateway serves all profiles (since 2026-09-29) + dashboard
+HERMES="HERMES_HOME=$HOME/.hermes $HOME/.local/bin/hermes"   # wrapper installed by hermes update (2026-09-29)
 cd ~/.hermes && eval $HERMES cron list                # default profile jobs
-cd ~/.hermes/profiles/argos && HERMES_HOME=$PWD ~/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main --profile argos cron list
-eval $HERMES cron run <job_id>                       # queue a job on the next scheduler tick
+cd ~/.hermes/profiles/argos && HERMES_HOME=$PWD ~/.local/bin/hermes --profile argos cron list
+eval $HERMES cron run <job_id>                       # run a job now
+eval $HERMES update --check | update --plan          # Hermes updates (channel: main; stable not published yet)
 ```
 
 Data home for all pipelines: **`/home/openclaw/ironclaw-data/`** (`~/.openclaw` is a compatibility symlink).
 
-## Profiles (one Hermes gateway each)
+Hermes: main @ 536802c (v0.21.4+canary, updated 2026-09-29), multiplexed gateway topology (one process serves every profile, `gateway.multiplex_profiles: true`). Hermes runs on its own managed runtime
+(Python 3.14 in `~/.hermes/tools/`, deps by `hermes pm`). Pipeline scripts that need google-ads, Camoufox or
+Playwright run in **`/home/openclaw/ironclaw-venv`** (Python 3.11): the Argos cron jobs carry
+`interpreter: /home/openclaw/ironclaw-venv/bin/python`, the watch fetch wrapper uses it via `HERMES_PY`.
+
+## Profiles (served by the single host gateway `hermes-gateway.service`)
 
 | Profile | Persona | Model | Slack home | Purpose |
 |---|---|---|---|---|
@@ -71,8 +77,9 @@ Per-pipeline details live in the skill folders (`server/hermes/skills/*/SKILL.md
 ```
 /home/openclaw/
   .hermes/                      Hermes home (default profile): config.yaml, .env, cron/jobs.json, skills/, scripts/
-    hermes-agent/               Hermes source + venv (python 3.11; camoufox installed here)
-    profiles/{argos,helios,athena,talos,scout}/   per-profile config, .env, cron, skills, scripts
+    hermes-agent/               Hermes source checkout (runtime: ~/.hermes/tools/python-3.14…, wrapper .hermes/bin/hermes)
+  ironclaw-venv/                our pipeline venv (python 3.11: google-ads, camoufox, playwright, boto3)
+    profiles/{argos,helios,athena,talos}/   per-profile config, .env, cron, skills, scripts (scout profile deleted 2026-09-29)
     skills/ironhack/{ironclaw-seo,job-market-scout}/  , skills/openclaw-imports/competitor-watch/
     scripts/                    no_agent cron scripts (seo-data-fetch.sh, competitor-watch-fetch.sh, scout-*.py)
   ironclaw-data/                pipeline data (was ~/.openclaw)

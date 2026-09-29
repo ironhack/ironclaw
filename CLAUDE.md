@@ -26,10 +26,11 @@ code; Rudy commits and pushes this repo manually.
 
 ```bash
 ssh openclaw-server                       # user openclaw; sudo password in memory (reference_server_access)
-HERMES="HERMES_HOME=$HOME/.hermes $HOME/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main"
+HERMES="HERMES_HOME=$HOME/.hermes $HOME/.local/bin/hermes"        # since the 2026-09-29 update
 cd ~/.hermes && eval $HERMES cron list | edit <id> --prompt "$(cat file)" | run <id> | pause <id> | doctor
-# argos profile: cd ~/.hermes/profiles/argos && HERMES_HOME=$PWD ... --profile argos cron ...
-systemctl --user restart hermes-gateway            # default profile; hermes-gateway-argos etc. for the others
+# argos profile: cd ~/.hermes/profiles/argos && HERMES_HOME=$PWD ~/.local/bin/hermes --profile argos cron ...
+# pipeline python (google-ads, camoufox, playwright): /home/openclaw/ironclaw-venv/bin/python
+systemctl --user restart hermes-gateway            # the ONE host gateway: restarts every profile's bots + cron (no per-profile units since 2026-09-29)
 journalctl --user -u hermes-gateway -n 50
 ```
 
@@ -43,6 +44,11 @@ Rules that have bitten before:
   no Unicode emoji in commands (Slack `:shortcodes:` only), no heredocs. Write scripts to files and run them.
 - **Never `pkill -f <pattern>` from an ssh one-liner** whose command line contains the pattern: it kills the
   ssh session itself (exit 255). Put such logic in a script file.
+- **Cron `.py` script jobs ignore shebangs** and run on Hermes's own Python 3.14 runtime unless the job has
+  `--interpreter`. Anything needing google-ads / Camoufox must use `/home/openclaw/ironclaw-venv/bin/python`
+  (Argos jobs carry the interpreter field; shell wrappers set the path explicitly).
+- **Hermes updates**: `hermes update --plan` first; export `CC=gcc CXX=g++ LDSHARED="gcc -shared"
+  LDCXXSHARED="g++ -shared"` (the managed Python wants clang); back up `~/.hermes` and the checkout first.
 - **Max ~3 headless browsers at once** on this 4-core / 8 GB box.
 - **`.env` files cannot be `source`d** (unquoted JSON values); parse them line by line in Python.
 - `~/.openclaw` is a symlink to `ironclaw-data`; code should reference `/home/openclaw/ironclaw-data/`.

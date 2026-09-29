@@ -24,7 +24,7 @@ and writing while this session worked.
    appear while you are still working.
 4. **`ps aux | grep competitor` shows NOTHING** — this check is
    insufficient. The sibling runs as an LLM session inside the hermes
-   gateway process (e.g. `/home/openclaw/.hermes/hermes-agent/venv/bin/python -m hermes_cli.main gateway run`), invisible to ps greps on
+   gateway process (e.g. `/home/openclaw/ironclaw-venv/bin/python -m hermes_cli.main gateway run`), invisible to ps greps on
    script names.
 5. **BUT the sibling's SHELL COMMANDS are visible in `ps aux`**
    (validated 2026-08-31). The sibling's terminal-driven recovery runs

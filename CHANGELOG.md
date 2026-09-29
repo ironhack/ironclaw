@@ -4,6 +4,75 @@ Ops log for the IronClaw server. Most recent entry first.
 
 ---
 
+## 2026-09-29 — Gateway topology: one multiplexed host gateway (afternoon)
+
+`hermes gateway migrate --multiplex -y` after a clean `--dry-run` (no blockers once the scout profile was
+gone). It stopped and uninstalled the four secondary units (`hermes-gateway-{argos,athena,helios,talos}`),
+set `gateway.multiplex_profiles: true` in the default `config.yaml`, restarted `hermes-gateway.service`
+(drain-first) and verified it serves default, argos, athena, helios, talos. Copies of the old unit files
+and configs: `pre-update-2026-09-29/pre-multiplex/` (Hermes has no rollback command for this).
+
+Verified: units = `hermes-gateway` + `hermes-dashboard` only; `profile list` shows all five running;
+Slack connected for default, argos, athena, helios and Telegram for default and talos inside the one
+process; no errors in the journal; cron ticker heartbeat of every profile home written by the host PID;
+Argos jobs keep their `interpreter`; doctor no longer reports legacy gateways; a timed throwaway job in
+the argos profile fired once with the ironclaw venv interpreter (removed afterwards).
+
+Operational changes: `systemctl --user restart hermes-gateway` now restarts every profile's bots and the
+cron scheduler for all profiles; there are no per-profile units to restart. Profile CLI use is unchanged
+(`--profile argos`).
+
+## 2026-09-29 — Hermes updated to main @ 536802c (v0.21.4+canary 2026-09-29)
+
+Done in a Tuesday window (no jobs until Wed 09:00 Rome). Backups first: `hermes backup` zip + config /
+cron / unit snapshots in `/home/openclaw/pre-update-2026-09-29/`, and a full copy of the checkout with its
+venv in `/home/openclaw/hermes-agent.pre-update-2026-09-29/` (rollback = directory swap + restart).
+
+- `hermes update --yes --no-backup`. Upstream had rewritten history: the updater took its orphan path
+  (rescue ref `refs/hermes-update-backups/orphan-main-20260929-…`, reset to origin/main), then handed off
+  to the new package manager, which builds an isolated runtime (managed Python 3.14.7 in
+  `~/.hermes/tools/`, all extras). Attempt 1 failed compiling python-olm (matrix extra): the managed
+  Python's sysconfig calls clang++, not installed. Attempt 2 with `CC=gcc CXX=g++ LDSHARED="gcc -shared"
+  LDCXXSHARED="g++ -shared"` exported succeeded in 6 minutes. All 6 services drained and restarted
+  (units now launch `~/.hermes/hermes-agent/.hermes/bin/hermes gateway run`), configs migrated 41 → 49
+  on every profile, cron jobs intact (8 / 2 / 1 enabled), Slack socket-mode sessions re-established on
+  default, argos, helios, athena.
+- **Consequence fixed**: cron `.py` script jobs now run on the Hermes runtime (no google-ads, no
+  Camoufox) unless the job has an `interpreter`. Created a dedicated venv `/home/openclaw/ironclaw-venv`
+  (Python 3.11: google-ads 31.1.0, camoufox 0.4.11, playwright 1.60.0, boto3, pyyaml, requests, bs4,
+  lxml), set `--interpreter` on both Argos jobs, pointed `competitor-watch-fetch.sh` (`HERMES_PY`) and the
+  watch skill references at it. Verified end to end with a throwaway no-agent job running
+  `argos/sanity_check.py` through Hermes (removed afterwards), plus Camoufox and Google Ads smoke tests.
+  SEO scripts (system python3) and Scout (stdlib) unaffected.
+- Update channel: `stable` is not published in the release archive yet, so the install stays on `main`.
+- `hermes doctor` is clean apart from: multiplex migration blocked (the dormant `scout` profile holds the
+  same Slack and Telegram tokens as `default`), dashboard unit missing `RestartPreventExitStatus=78`
+  (repair: `hermes gateway install`), and an agent-browser dependency advisory owned upstream.
+
+- Deleted the unused `scout` Hermes profile (created 2026-06-18, never a session or a cron job; the
+  job-market Scout pipeline runs on the default profile). It held copies of default's Slack and Telegram
+  tokens, which blocked the multiplex migration. Backup: `pre-update-2026-09-29/profile-scout-2026-09-29.tgz`.
+
+- Every standalone gateway now logs "Multiplex cron scheduler started for N profiles", so duplicate
+  firing was checked with a throwaway timed no-agent job in the argos profile: it fired exactly once
+  (argos gateway; per-fire claim locks `.fire-<hash>.lock` + `.tick.lock`). Heartbeats: default's gateway
+  ticks default, helios, athena, talos; argos ticks itself. Test job and script removed.
+
+Follow-ups: watch Wed 09:00 sanity post and Thu Argos/SEO runs; `hermes gateway migrate --multiplex`
+as a separate step now that nothing blocks it; delete the two backup dirs after a clean week;
+old `hermes-agent/venv` can go at the next update.
+
+## 2026-09-29 — Hermes upgrade study (no code change)
+
+Installed Hermes is v0.21.0 (git main @ d9833c56, 2026-09-07); upstream stable is v0.21.5 (2026-09-24) and
+upstream rewrote its history, so the checkout has no merge-base with origin/main (`hermes update` has an
+orphan / checkout-swap path for this; `hermes update --check` and `--plan` work and list our 6 services).
+Only a `git fetch` was run on the server. Findings and the decision list are in the session notes and in
+`project_hermes_upgrade` memory: multiplex-only gateway topology (our 5 per-profile systemd gateways are now
+"legacy", still supported), config migrations 41 → 49, extra venv packages (google-ads, camoufox,
+playwright) to re-install after an update, cron job fields unchanged. Recommendation: planned window,
+stable channel, keep standalone gateways on the first update, migrate to multiplex as a second step.
+
 ## 2026-09-29 — Argos daily sanity converted to the generator-posts pattern
 
 Rudy flagged that the 09:00 sanity post in #argos-home was still the old format and double-posted (Block Kit

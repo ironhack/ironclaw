@@ -6,7 +6,7 @@
 # stdout = digest for the Phase 2 agent (context_from). Never aborts on one step failing.
 set -uo pipefail
 SK="/home/openclaw/.hermes/skills/openclaw-imports/competitor-watch/scripts"
-PY="${HERMES_PY:-/home/openclaw/.hermes/hermes-agent/venv/bin/python}"
+PY="${HERMES_PY:-/home/openclaw/ironclaw-venv/bin/python}"
 D=$(date +%Y-%m-%d)
 LOG="/home/openclaw/ironclaw-data/workspace/competitor-watch/fetch-$D.log"
 mkdir -p "$(dirname "$LOG")"; : > "$LOG"
