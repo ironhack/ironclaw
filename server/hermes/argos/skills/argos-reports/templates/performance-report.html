@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Argos — Performance Report — {date}</title>
+  <style>
+    * {{ box-sizing: border-box; }}
+    body {{ font-family: Arial, sans-serif; max-width: 1320px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a; background: #fff; }}
+    .header {{ display: flex; align-items: center; justify-content: space-between; border-bottom: 4px solid #5BBFE3; padding-bottom: 20px; margin-bottom: 0; }}
+    .header img {{ height: 48px; }}
+    .header-right {{ text-align: right; }}
+    .header-label {{ font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #5BBFE3; }}
+    .header-date {{ font-size: 12px; color: #888; margin-top: 2px; }}
+    .hero {{ background: linear-gradient(135deg, #0d1b2a 0%, #1a3a5c 100%); color: #fff; border-radius: 8px; padding: 28px 32px; margin: 24px 0 20px; }}
+    .hero h1 {{ font-size: 26px; font-weight: bold; margin: 0 0 6px; }}
+    .hero .hero-sub {{ font-size: 14px; color: #9dcfe8; margin: 0; }}
+
+    /* Tabs: timeframe (row 1) and channel (row 2) */
+    .tabs {{ display: flex; gap: 4px; margin-bottom: 0; border-bottom: 2px solid #e4e8ec; flex-wrap: wrap; align-items: flex-end; }}
+    .tabs-label {{ font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #aaa; padding: 10px 12px 10px 0; }}
+    .tab-btn {{ padding: 10px 22px; border: none; background: none; font-size: 14px; font-weight: bold; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }}
+    .tab-btn:hover {{ color: #0d1b2a; }}
+    .tab-btn.active {{ color: #5BBFE3; border-bottom-color: #5BBFE3; }}
+    .tabs.tabs-channel {{ margin-bottom: 20px; border-bottom-color: #f0f2f4; }}
+    .tabs.tabs-channel .tab-btn {{ font-size: 13px; padding: 8px 18px; }}
+    .tabs.tabs-channel .tab-btn.active {{ color: #0d1b2a; border-bottom-color: #0d1b2a; }}
+    .tab-content {{ display: none; }}
+    .tab-content.active {{ display: block; }}
+
+    /* Summary cards */
+    .summary-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }}
+    .summary-card {{ border: 1px solid #e4e8ec; border-radius: 8px; padding: 12px 14px; }}
+    .summary-label {{ font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #888; margin-bottom: 4px; }}
+    .summary-value {{ font-size: 22px; font-weight: bold; color: #0d1b2a; line-height: 1.1; }}
+    .summary-sub {{ font-size: 11px; color: #888; margin-top: 4px; }}
+
+    /* Funnel strip */
+    .funnel-title {{ font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #2a6a85; margin: 6px 0 8px; }}
+    .funnel-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px; }}
+    .funnel-card {{ border: 1px solid #c0e4f0; background: #f7fcfe; border-radius: 8px; padding: 10px 12px; position: relative; }}
+    .funnel-card .summary-value {{ font-size: 20px; }}
+    .funnel-card .stage-rate {{ font-size: 11px; color: #2a6a85; margin-top: 4px; }}
+
+    /* Insights box */
+    .insights-box {{ background: linear-gradient(135deg, #f0f8fc 0%, #e8f4fd 100%); border: 1px solid #c0e4f0; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }}
+    .insights-title {{ font-size: 14px; font-weight: bold; color: #0d1b2a; margin-bottom: 10px; }}
+    .insight-row {{ font-size: 13px; line-height: 1.6; color: #1a3a5c; padding: 6px 0; border-bottom: 1px solid #d0e8f4; }}
+    .insight-row:last-child {{ border-bottom: none; }}
+    .insight-row .delta {{ display: inline; font-size: 12px; margin: 0; }}
+
+    /* Section hint */
+    .section-hint {{ background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; margin: 12px 0 16px; font-size: 12px; line-height: 1.5; color: #713f12; }}
+
+    /* Section */
+    .section-title {{ font-size: 16px; font-weight: bold; color: #0d1b2a; border-left: 4px solid #5BBFE3; padding-left: 10px; margin: 28px 0 12px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }}
+    .section-title .arrow {{ font-size: 12px; transition: transform 0.2s; display: inline-block; }}
+    .section-title.collapsed .arrow {{ transform: rotate(-90deg); }}
+    .section-body {{ overflow: hidden; }}
+    .section-body.collapsed {{ display: none; }}
+    .period-note {{ font-size: 12px; color: #888; margin-bottom: 12px; }}
+    .table-tools {{ display: flex; justify-content: flex-end; gap: 12px; margin: 0 0 6px; }}
+    .link-btn {{ background: none; border: 1px solid #c0e4f0; color: #2a6a85; border-radius: 12px; padding: 3px 10px; font-size: 11px; cursor: pointer; }}
+    .link-btn:hover {{ background: #f0f8fc; }}
+
+    /* Tables */
+    .table-wrap {{ overflow-x: auto; margin-bottom: 8px; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    th {{ background: #f0f8fc; color: #2a6a85; text-align: left; padding: 9px 8px; font-weight: bold; border-bottom: 2px solid #c0e4f0; white-space: nowrap; font-size: 12px; }}
+    th.num {{ text-align: right; }}
+    td {{ padding: 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }}
+    td.num {{ text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }}
+    td.lbl {{ max-width: 240px; overflow-wrap: anywhere; }}
+    tr:last-child td {{ border-bottom: none; }}
+    tr:hover td {{ background: #fafcfe; }}
+    td.funnel-cell {{ font-family: Menlo, Consolas, monospace; font-size: 12px; text-align: right; white-space: nowrap; }}
+    .funnel-prev {{ font-size: 10px; color: #999; display: block; margin-top: 1px; }}
+    th.funnel-head {{ text-align: right; }}
+
+    /* Device sub-rows */
+    .dev-toggle {{ background: none; border: none; color: #5BBFE3; cursor: pointer; font-size: 11px; padding: 0 4px 0 0; }}
+    .dev-toggle::before {{ content: "▸ "; }}
+    .dev-toggle.open::before {{ content: "▾ "; }}
+    tr.dev-row td {{ background: #fafbfc; font-size: 12px; color: #444; border-bottom: 1px dashed #eee; }}
+    tr.dev-row td.dev-label {{ padding-left: 26px; color: #2a6a85; font-weight: bold; }}
+    tr.dev-row:hover td {{ background: #f3f7fa; }}
+
+    /* Delta cells */
+    .delta {{ font-size: 11px; display: block; margin-top: 1px; }}
+    .delta-up {{ color: #c0392b; }}    /* red = cost/CPA up = bad */
+    .delta-down {{ color: #27ae60; }}  /* green = cost/CPA down = good */
+    .delta-up-good {{ color: #27ae60; }}    /* green = conversions/clicks up = good */
+    .delta-down-bad {{ color: #c0392b; }}   /* red = conversions/clicks down = bad */
+    .delta-flat {{ color: #888; }}
+    .delta-new {{ color: #888; font-style: italic; }}
+
+    /* Badges */
+    .badge {{ display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; white-space: nowrap; }}
+    .badge-brand {{ background: #e8f0fe; color: #1a56b0; }}
+    .badge-generic {{ background: #f0f8fc; color: #2a6a85; }}
+    .badge-pmax {{ background: #fff7ed; color: #c2410c; }}
+    .badge-display {{ background: #f3e8ff; color: #6b21a8; }}
+    .badge-other {{ background: #f0f0f0; color: #555; }}
+    .badge-exact {{ background: #e8f5e9; color: #2e7d32; }}
+    .badge-phrase {{ background: #fff3e0; color: #e65100; }}
+    .badge-broad {{ background: #fce4ec; color: #c62828; }}
+    .badge-paused {{ background: #f0f0f0; color: #777; }}
+
+    .footer {{ margin-top: 48px; font-size: 11px; color: #bbb; border-top: 1px solid #eee; padding-top: 14px; }}
+
+    @media print {{
+      body {{ padding: 16px; }}
+      .hero {{ background: #0d1b2a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+      .tabs {{ display: none; }}
+      .table-tools {{ display: none; }}
+    }}
+  </style>
+  <script>
+    var argosState = {{ tf: 'last_7d', ch: 'all' }};
+    function showActive() {{
+      document.querySelectorAll('.tab-content').forEach(function (c) {{ c.classList.remove('active'); }});
+      var el = document.getElementById('tab-' + argosState.tf + '-' + argosState.ch);
+      if (el) el.classList.add('active');
+      document.querySelectorAll('.tab-btn[data-tf]').forEach(function (b) {{ b.classList.toggle('active', b.dataset.tf === argosState.tf); }});
+      document.querySelectorAll('.tab-btn[data-ch]').forEach(function (b) {{ b.classList.toggle('active', b.dataset.ch === argosState.ch); }});
+      try {{ history.replaceState(null, '', '#' + argosState.tf + '/' + argosState.ch); }} catch (e) {{}}
+    }}
+    function switchTab(tf) {{ argosState.tf = tf; showActive(); }}
+    function switchChannel(ch) {{ argosState.ch = ch; showActive(); }}
+    function toggleSection(el) {{
+      el.classList.toggle('collapsed');
+      el.nextElementSibling.classList.toggle('collapsed');
+    }}
+    function toggleDevices(btn) {{
+      var tr = btn.closest('tr');
+      var open = btn.classList.toggle('open');
+      tr.parentElement.querySelectorAll('tr.dev-row[data-parent="' + tr.dataset.rowid + '"]').forEach(function (r) {{
+        r.style.display = open ? 'table-row' : 'none';
+      }});
+    }}
+    function toggleAllDevices(btn) {{
+      var wrap = btn.closest('.section-body').querySelector('table');
+      var open = btn.dataset.open !== '1';
+      btn.dataset.open = open ? '1' : '0';
+      btn.textContent = open ? 'Hide device splits' : 'Show all device splits';
+      wrap.querySelectorAll('tr.dev-row').forEach(function (r) {{ r.style.display = open ? 'table-row' : 'none'; }});
+      wrap.querySelectorAll('.dev-toggle').forEach(function (t) {{ t.classList.toggle('open', open); }});
+    }}
+    document.addEventListener('DOMContentLoaded', function () {{
+      var h = (location.hash || '').replace('#', '').split('/');
+      if (h[0] && document.getElementById('tab-' + h[0] + '-' + (h[1] || 'all'))) {{ argosState.tf = h[0]; argosState.ch = h[1] || 'all'; }}
+      showActive();
+    }});
+  </script>
+</head>
+<body>
+  <div class="header">
+    <img src="data:image/jpeg;base64,{logo_b64}" alt="Ironhack">
+    <div class="header-right">
+      <div class="header-label">Argos — Google Ads Intelligence</div>
+      <div class="header-date">Performance Report &middot; {date}</div>
+    </div>
+  </div>
+  <div class="hero">
+    <h1>&#128200; Performance Report</h1>
+    <p class="hero-sub">Campaigns &middot; Ad Groups &middot; Keywords &middot; Ads &middot; Funnel stages &middot; Devices &middot; Auction Insights</p>
+  </div>
+
+  <!-- Timeframe tabs -->
+  <div class="tabs">
+    <span class="tabs-label">Period</span>
+    <button class="tab-btn active" data-tf="last_7d" onclick="switchTab('last_7d')">Last 7 Days</button>
+    <button class="tab-btn" data-tf="last_14d" onclick="switchTab('last_14d')">Last 14 Days</button>
+    <button class="tab-btn" data-tf="last_30d" onclick="switchTab('last_30d')">Last 30 Days</button>
+  </div>
+  <!-- Channel tabs -->
+  <div class="tabs tabs-channel">
+    <span class="tabs-label">Channel</span>
+{channel_tabs_html}
+  </div>
+
+{tabs_html}
+
+  <div class="footer">Ironhack &mdash; Argos Marketing Intelligence &nbsp;&middot;&nbsp; {date} &nbsp;&middot;&nbsp; Data sourced from Google Ads API. Comparisons are vs. the same-length period immediately prior. Channel = campaign name (brand / generic / PMAX / display &amp; YouTube). Funnel stages = primary conversion actions.</div>
+</body>
+</html>

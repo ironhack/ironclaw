@@ -1,0 +1,23 @@
+Run the Competitor Watch v2 report (competitor-watch skill, section "Workflow v2"). Today's date is the Monday of this run (YYYY-MM-DD, use `date +%F`). Phase 1 has already run this morning. First read its digest: /home/openclaw/ironclaw-data/workspace/competitor-watch/digest-DATE.md (also digest-LATEST.md). It lists, per competitor, how many pages were captured and which are empty or degraded, plus new site URLs from the sitemaps. If the digest for today is missing, run `bash /home/openclaw/.hermes/scripts/competitor-watch-fetch.sh` (about 8 minutes) and continue. Prepared, boilerplate-stripped page texts are in /home/openclaw/ironclaw-data/workspace/competitor-watch/prepared/DATE/<key>.txt.
+
+Your job is extraction and interpretation. Scripts keep the state and detect changes; you do not diff pages, do not recover failed fetches, do not scan news, do not write HTML.
+
+1. EXTRACT, one competitor at a time (lewagon, nuclio, neuefische, spiced, fourgeeks, masterschool, liora): read prepared/DATE/<key>.txt and write /home/openclaw/ironclaw-data/workspace/competitor-watch/extractions/DATE/<key>.json following references/extraction-schema.md exactly. Every program, claim and promotion needs an `evidence` quote of at least 20 characters copied verbatim from that page. Only real offerings. null when not stated. Never invent prices or durations. If a competitor's capture is "bad" in the digest, still extract what the usable pages show; the reconciler will not mark anything removed on a bad capture.
+
+2. RECONCILE: python3 /home/openclaw/.hermes/skills/openclaw-imports/competitor-watch/scripts/cw-reconcile.py apply --date DATE
+   It prints, per competitor, verified changes and any UNVERIFIED items (evidence not found verbatim). Fix unverified items that are real by correcting the quote in the extraction JSON and re-run apply (re-runs replace that date's entries). Unverified items you cannot ground are dropped; do not force them.
+
+3. NARRATIVE: write /tmp/cw-narrative.json:
+   {"headline": "ONE sentence: what changed this week and why it matters to Ironhack (or 'Quiet week: ...' with the one thing worth knowing)",
+    "actions": ["2-4 concrete things for Ironhack product/marketing, only if the changes justify them"],
+    "change_notes": {"<change id from the reconcile digest, e.g. DATE:spiced:program_removed:...>": "one line on why it matters"},
+    "competitor_notes": {"<key>": "one line on the competitor's direction, only where something is worth saying"},
+    "watch_next": ["up to 3 things to check next week (new program URLs in site activity, unconfirmed programs, cohort dates)"]}
+   Use only verified changes and the digest. Do not repeat catalog facts that did not change. Site activity (new URLs) is a lead, not a change: mention it in watch_next unless a new program page is already live, in which case say so.
+
+4. BUILD + POST: python3 /home/openclaw/.hermes/skills/openclaw-imports/competitor-watch/scripts/cw-build-report.py --date DATE --narrative /tmp/cw-narrative.json --post
+   Uploads the cumulative report to S3 (watch/DATE/ and watch/latest/) and posts the Block Kit message + details thread to C0B1MM39P8D. Prints the URL and "SLACK_POSTED ... ts=". If Slack fails, re-run without --post and paste the printed text as your final response.
+
+5. FINAL RESPONSE: one line "Posted <URL> (ts <ts>)". This job does not deliver its response to Slack.
+
+Rules: no execute_code (blocked in cron mode); write files with write_file, run scripts with terminal; never use Unicode emoji in commands; no em dashes; never summarise a page you did not read; a program is "new" only if the reconciler says program_added with first_seen = DATE.

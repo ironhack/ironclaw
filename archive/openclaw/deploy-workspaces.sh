@@ -15,7 +15,7 @@ echo "Deploying ironclaw-edu workspace..."
 rsync -av --progress "$LOCAL_BASE/workspace-ironclaw-edu/" "$SERVER:$REMOTE_BASE/workspace-ironclaw-edu/"
 
 echo "Deploying ironclaw-jobs workspace..."
-rsync -av --progress "$LOCAL_BASE/workspace-ironclaw-jobs/" "$SERVER:$REMOTE_BASE/workspace-ironclaw-jobs/"
+rsync -av --progress --exclude='*.db' "$LOCAL_BASE/workspace-ironclaw-jobs/" "$SERVER:$REMOTE_BASE/workspace-ironclaw-jobs/"
 
 echo "Done. Restart the gateway if needed:"
 echo "  ssh $SERVER 'systemctl --user restart openclaw-gateway'"

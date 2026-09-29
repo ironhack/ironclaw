@@ -1,0 +1,23 @@
+{
+  "_comment": "Pages carrying bot/automated query volume (massive impressions, ~0 clicks). Excluded from AI-Overview risk analysis and head-term skew detection. Add an entry when a new one is confirmed; keep the note.",
+  "pages": [
+    {
+      "path_regex": "^/fr/blog/langage-c-tout-savoir",
+      "label": "FR C-language article ('c' query artifact)",
+      "note": "Single-letter query 'c' (+ variants c', c., c\\\\) hits this article with ~50-80K imp/week at ~0.02% CTR. Confirmed Aug 2026.",
+      "added": "2026-08-01"
+    },
+    {
+      "path_regex": "^/fr/blog/comprendre-google-colab",
+      "label": "FR Google Colab article",
+      "note": "'google colab' / 'colab' queries, ~10K imp/week, 0 clicks. Confirmed Sep 2026.",
+      "added": "2026-09-14"
+    },
+    {
+      "path_regex": "^/es/blog/que-es-google-colab",
+      "label": "ES Google Colab article",
+      "note": "Same pattern as FR Colab, ~2K imp/week, 0 clicks. Confirmed 2026-09-24.",
+      "added": "2026-09-24"
+    }
+  ]
+}

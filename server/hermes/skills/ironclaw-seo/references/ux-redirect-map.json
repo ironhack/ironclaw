@@ -1,0 +1,241 @@
+{
+  "sources": [
+    {
+      "url": "https://www.ironhack.com/es/diseno-ux-ui/madrid",
+      "country": "Spain",
+      "language": "ES",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/es/diseno-ux-ui"
+    },
+    {
+      "url": "https://www.ironhack.com/es/diseno-ux-ui/barcelona",
+      "country": "Spain",
+      "language": "ES",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/es/diseno-ux-ui"
+    },
+    {
+      "url": "https://www.ironhack.com/es/diseno-ux-ui/remoto",
+      "country": "Spain",
+      "language": "ES",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/es/diseno-ux-ui"
+    },
+    {
+      "url": "https://www.ironhack.com/es-en/ux-ui-design/madrid",
+      "country": "Spain",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/es-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/es-en/ux-ui-design/barcelona",
+      "country": "Spain",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/es-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/es-en/ux-ui-design/remote",
+      "country": "Spain",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/es-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/fr/ux-ui-design/paris",
+      "country": "France",
+      "language": "FR",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/fr/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/fr/ux-ui-design/a-distance",
+      "country": "France",
+      "language": "FR",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/fr/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/fr-en/ux-ui-design/paris",
+      "country": "France",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/fr-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/fr-en/ux-ui-design/remote",
+      "country": "France",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/fr-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/de/ux-ui-design/berlin",
+      "country": "Germany",
+      "language": "DE",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/de/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/de/ux-ui-design/remote",
+      "country": "Germany",
+      "language": "DE",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/de/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/de-en/ux-ui-design/berlin",
+      "country": "Germany",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/de-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/de-en/ux-ui-design/remote",
+      "country": "Germany",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/de-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/pt/ux-ui-design/lisboa",
+      "country": "Portugal",
+      "language": "PT",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/pt/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/pt/ux-ui-design/remoto",
+      "country": "Portugal",
+      "language": "PT",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/pt/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/pt-en/ux-ui-design/lisbon",
+      "country": "Portugal",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/pt-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/pt-en/ux-ui-design/remote",
+      "country": "Portugal",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/pt-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/nl/ux-ui-design/amsterdam",
+      "country": "Netherlands",
+      "language": "NL",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/nl/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/nl/ux-ui-design/remote",
+      "country": "Netherlands",
+      "language": "NL",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/nl/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/nl-en/ux-ui-design/amsterdam",
+      "country": "Netherlands",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/nl-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/nl-en/ux-ui-design/remote",
+      "country": "Netherlands",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/nl-en/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/gb/ux-ui-design/remote",
+      "country": "UK",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/gb/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/gb/ux-ui-design/london",
+      "country": "UK",
+      "language": "EN",
+      "type": "Location",
+      "destination": "https://www.ironhack.com/gb/ux-ui-design"
+    },
+    {
+      "url": "https://www.ironhack.com/us/ux-ui-design/remote",
+      "country": "US",
+      "language": "EN",
+      "type": "Remote",
+      "destination": "https://www.ironhack.com/us/ux-ui-design"
+    }
+  ],
+  "destinations": [
+    {
+      "url": "https://www.ironhack.com/es/diseno-ux-ui",
+      "country": "Spain",
+      "language": "ES"
+    },
+    {
+      "url": "https://www.ironhack.com/es-en/ux-ui-design",
+      "country": "Spain",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/fr/ux-ui-design",
+      "country": "France",
+      "language": "FR"
+    },
+    {
+      "url": "https://www.ironhack.com/fr-en/ux-ui-design",
+      "country": "France",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/de/ux-ui-design",
+      "country": "Germany",
+      "language": "DE"
+    },
+    {
+      "url": "https://www.ironhack.com/de-en/ux-ui-design",
+      "country": "Germany",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/pt/ux-ui-design",
+      "country": "Portugal",
+      "language": "PT"
+    },
+    {
+      "url": "https://www.ironhack.com/pt-en/ux-ui-design",
+      "country": "Portugal",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/nl/ux-ui-design",
+      "country": "Netherlands",
+      "language": "NL"
+    },
+    {
+      "url": "https://www.ironhack.com/nl-en/ux-ui-design",
+      "country": "Netherlands",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/gb/ux-ui-design",
+      "country": "UK",
+      "language": "EN"
+    },
+    {
+      "url": "https://www.ironhack.com/us/ux-ui-design",
+      "country": "US",
+      "language": "EN"
+    }
+  ]
+}
